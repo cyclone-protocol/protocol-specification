@@ -24,9 +24,9 @@ Cyclone specifies that it becomes exactly this byte sequence:
    Hp = 100    Length = 5      A  l  i  c  e
 ```
 
-13 bytes. No field names, no braces, no tags — just data.
+13 bytes. No field names, no braces, no tags - just data.
 
-The key point: **Go, C#, Rust and C must all produce these exact 13 bytes.** Not "equivalent" — identical, byte for byte.
+The key point: **Go, C#, Rust and C must all produce these exact 13 bytes.** Not "equivalent" - identical, byte for byte.
 
 ---
 
@@ -34,9 +34,9 @@ The key point: **Go, C#, Rust and C must all produce these exact 13 bytes.** Not
 
 With JSON or Protobuf, the same data can produce different bytes depending on the language, the library, the version. Usually that's fine. It breaks completely when:
 
-- You **sign or hash** a payload — a signature covers bytes; if the bytes change the signature fails even though the data didn't.
-- You run **replay or lockstep** — two machines must reach the same result from the same input sequence.
-- You want to **prove two SDKs are compatible** — the only way is to compare bytes.
+- You **sign or hash** a payload - a signature covers bytes; if the bytes change the signature fails even though the data didn't.
+- You run **replay or lockstep** - two machines must reach the same result from the same input sequence.
+- You want to **prove two SDKs are compatible** - the only way is to compare bytes.
 
 Cyclone solves this by removing every choice: wherever an encoder is allowed to choose, two encoders will eventually choose differently.
 
@@ -67,7 +67,7 @@ Four rules are enough to understand the whole thing:
 
 **2. Strings and arrays are length-prefixed.** `[4-byte length][data]`. For strings, the length is the **number of UTF-8 bytes**, not characters.
 
-**3. A struct is its fields, concatenated.** No header, no padding, no delimiter. The decoder knows which field it is reading **from the cursor position**, not from a tag.
+**3. A Model is its fields, concatenated.** No header, no padding, no delimiter. The decoder knows which field it is reading **from the cursor position**, not from a tag.
 
 **4. No metadata.** The byte stream is not self-describing. The receiver **must** already know the exact order and type of every field.
 
@@ -81,11 +81,19 @@ Wrong definition  →  usually NO error, just silently wrong data
 
 ---
 
-## Cyclone has no separate Schema Definition
+## Cyclone does not mandate an IDL
 
-No IDL. No `.cyclone` file. No schema document to compile ahead of time.
+The source of truth is the **Schema** - the type names, field names, Cyclone types, and field order. The bytes come from the Schema, and from nothing else.
 
-**Your model, annotated, is the one and only definition.**
+But Cyclone does not dictate how you **write** that Schema down:
+
+```
+Many ways of expressing it   →   one Schema   →   exactly one byte sequence
+```
+
+No mandatory `.cyclone` file. No mandatory IDL compiler. As long as both ends derive the same Schema, the bytes match.
+
+The Reference Implementation expresses it with annotations on your existing model - in C#, for example:
 
 ```csharp
 [Network]
@@ -99,7 +107,7 @@ public partial class Player
 }
 ```
 
-Cyclone does not need to understand `public`, `partial`, `class`, `uint`, or whether `PlayerInfo` is a class or a struct. It only has to extract three things:
+It does not need to understand `public`, `partial`, `class`, `uint`, or whether `PlayerInfo` is a class or a struct. It only has to extract three things to build the Schema:
 
 ```
 Type Name    →  Player
@@ -107,9 +115,11 @@ Field Name   →  Hp
 Cyclone Type →  UInt32
 ```
 
-The annotation is the **single source of truth**. If you write `[Network(UInt32)]` on a field of a different type, Cyclone still generates `UInt32` — and reports an error if they don't match. That is a declaration error, not something Cyclone is supposed to guess.
+The Cyclone type comes from the annotation; it is never inferred from the language's own type. Writing `[Network(UInt32)]` on an incompatible field is a declaration error and is reported as one - Cyclone does not guess on your behalf.
 
-The consequence: writing a frontend for a new language is very light. Each language only needs to read the annotation, the type name and the field name — no semantic analysis, no reflection, no understanding of that language's type system.
+The consequence: adding a new language is very light. A frontend only needs to read the annotation, the type name and the field name - no semantic analysis, no understanding of that language's type system.
+
+Another implementation is free to choose a different route entirely - a separate schema file, macros, or a hand-written codec. There is only one standard to judge it by: are the bytes right.
 
 ---
 
@@ -136,7 +146,7 @@ Same schema, same values
 Every implementation MUST produce identical bytes.
 ```
 
-If they don't, that is an **implementation bug**, not a protocol one. And that bug is caught by a single byte-array comparison — see the Conformance document.
+If they don't, that is an **implementation bug**, not a protocol one. And that bug is caught by a single byte-array comparison - see the Conformance document.
 
 ---
 
@@ -146,13 +156,13 @@ Read in this order:
 
 | Document | Answers |
 |----------|---------|
-| [RFC-0001 — What Cyclone is](en/RFC-0001.md) | What problem it solves, why choose it, when **not** to |
-| [RFC-0002 — Wire Format](en/RFC-0002.md) | What shape the bytes must have |
-| [RFC-0003 — Conformance](en/RFC-0003.md) | How do I know my implementation is correct (test vectors) |
+| [RFC-0001 - What Cyclone is](en/RFC-0001.md) | What problem it solves, why choose it, when **not** to |
+| [RFC-0002 - Wire Format](en/RFC-0002.md) | What shape the bytes must have |
+| [RFC-0003 - Conformance](en/RFC-0003.md) | How do I know my implementation is correct (test vectors) |
 
 Vietnamese source of record: [`vi/RFC-0001.md`](vi/RFC-0001.md) · [`vi/RFC-0002.md`](vi/RFC-0002.md) · [`vi/RFC-0003.md`](vi/RFC-0003.md)
 
-Landing page: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) — source in [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese)
+Landing page: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - source in [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese)
 
 ---
 
@@ -189,14 +199,14 @@ Vietnamese is the source of record; English is a translation. The workflow is de
 ├── index.html           landing page, English (GitHub Pages)
 ├── LICENSE              CC BY 4.0
 │
-├── vi/                  Vietnamese — source of record
+├── vi/                  Vietnamese - source of record
 │   ├── README.md
 │   ├── index.html
 │   ├── RFC-0001.md      What Cyclone is
 │   ├── RFC-0002.md      Wire Format Specification
 │   └── RFC-0003.md      Conformance
 │
-└── en/                  English — translation
+└── en/                  English - translation
     ├── RFC-0001.md
     ├── RFC-0002.md
     └── RFC-0003.md
@@ -204,11 +214,11 @@ Vietnamese is the source of record; English is a translation. The workflow is de
 
 ## License
 
-This entire repository is under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — see [`LICENSE`](LICENSE).
+This entire repository is under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - see [`LICENSE`](LICENSE).
 
 You are free to copy, translate, quote and create derivative works from the specification, including commercially, as long as you **give attribution**.
 
-This is a **specification, not software**. Your implementation is a separate work, not a derivative of the specification — you are free to license it however you like.
+This is a **specification, not software**. Your implementation is a separate work, not a derivative of the specification - you are free to license it however you like.
 
 ## Copyright
 

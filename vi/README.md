@@ -24,7 +24,7 @@ Cyclone quy định nó thành đúng chuỗi byte này:
    Hp = 100    Length = 5      A  l  i  c  e
 ```
 
-13 byte. Không có tên field, không có dấu ngoặc, không có thẻ đánh dấu — chỉ có dữ liệu.
+13 byte. Không có tên field, không có dấu ngoặc, không có thẻ đánh dấu - chỉ có dữ liệu.
 
 Điểm mấu chốt: **Go, C#, Rust hay C đều phải sinh ra đúng 13 byte này.** Không phải "tương đương", mà là giống hệt từng byte.
 
@@ -34,9 +34,9 @@ Cyclone quy định nó thành đúng chuỗi byte này:
 
 Với JSON hay Protobuf, cùng một dữ liệu có thể ra byte khác nhau tuỳ ngôn ngữ, tuỳ thư viện, tuỳ version. Thường thì không sao. Nhưng nó hỏng hẳn khi:
 
-- Bạn **ký hoặc hash** payload — chữ ký ký lên byte, byte đổi thì chữ ký sai dù dữ liệu không đổi.
-- Bạn chạy **replay hoặc lockstep** — hai máy phải ra cùng một kết quả từ cùng một chuỗi input.
-- Bạn muốn **kiểm chứng hai SDK tương thích** — cách duy nhất là so byte.
+- Bạn **ký hoặc hash** payload - chữ ký ký lên byte, byte đổi thì chữ ký sai dù dữ liệu không đổi.
+- Bạn chạy **replay hoặc lockstep** - hai máy phải ra cùng một kết quả từ cùng một chuỗi input.
+- Bạn muốn **kiểm chứng hai SDK tương thích** - cách duy nhất là so byte.
 
 Cyclone giải bài toán này bằng cách bỏ hết lựa chọn: chỗ nào encoder được quyền chọn, chỗ đó hai encoder sẽ chọn khác nhau.
 
@@ -67,7 +67,7 @@ Bốn quy tắc đủ để hiểu toàn bộ:
 
 **2. Chuỗi và mảng có tiền tố độ dài.** `[4 byte length][dữ liệu]`. Với chuỗi, length là **số byte UTF-8**, không phải số ký tự.
 
-**3. Struct là các field nối liền nhau.** Không header, không padding, không delimiter. Decoder biết đang đọc field nào **nhờ vị trí con trỏ**, không nhờ tag.
+**3. Model là các field nối liền nhau.** Không header, không padding, không delimiter. Decoder biết đang đọc field nào **nhờ vị trí con trỏ**, không nhờ tag.
 
 **4. Không có metadata.** Byte stream không tự mô tả. Bên nhận **bắt buộc** phải biết trước đúng thứ tự và kiểu của từng field.
 
@@ -81,11 +81,19 @@ Sai định nghĩa     →  thường KHÔNG báo lỗi, mà ra dữ liệu sai 
 
 ---
 
-## Cyclone không có Schema Definition riêng
+## Cyclone không bắt buộc một IDL
 
-Không có IDL. Không có file `.cyclone`. Không có tài liệu schema phải biên dịch trước.
+Nguồn sự thật là **Schema** - tập hợp tên type, tên field, kiểu Cyclone, và thứ tự field. Byte stream sinh ra từ Schema, và chỉ từ Schema.
 
-**Model của bạn, đã đánh dấu annotation, chính là định nghĩa duy nhất.**
+Nhưng Cyclone không quy định bạn phải **viết** Schema đó ra bằng cách nào:
+
+```
+Nhiều cách diễn đạt   →   một Schema   →   đúng một chuỗi byte
+```
+
+Không có file `.cyclone` bắt buộc. Không có trình biên dịch IDL bắt buộc. Miễn hai phía rút ra cùng một Schema, byte sẽ giống nhau.
+
+Reference Implementation chọn cách diễn đạt bằng annotation ngay trên model có sẵn - ví dụ trong C#:
 
 ```csharp
 [Network]
@@ -99,7 +107,7 @@ public partial class Player
 }
 ```
 
-Cyclone không cần hiểu `public`, `partial`, `class`, `uint`, hay `PlayerInfo` là class hay struct. Nó chỉ cần trích ra đúng ba thứ:
+Nó không cần hiểu `public`, `partial`, `class`, `uint`, hay `PlayerInfo` là class hay struct. Chỉ cần trích ra đúng ba thứ để dựng nên Schema:
 
 ```
 Type Name    →  Player
@@ -107,9 +115,11 @@ Field Name   →  Hp
 Cyclone Type →  UInt32
 ```
 
-Annotation là **nguồn sự thật duy nhất**. Nếu bạn viết `[Network(UInt32)]` trên một field kiểu khác, Cyclone vẫn sinh theo `UInt32` — và báo lỗi nếu không khớp. Đó là lỗi khai báo, không phải chuyện Cyclone phải đoán.
+Kiểu Cyclone lấy từ annotation, không suy đoán từ kiểu của ngôn ngữ. Viết `[Network(UInt32)]` trên một field không tương thích là lỗi khai báo và bị báo lỗi - Cyclone không đoán thay bạn.
 
-Hệ quả: viết frontend cho một ngôn ngữ mới rất nhẹ. Mỗi ngôn ngữ chỉ cần đọc được annotation + tên type + tên field, không cần semantic analysis, không cần reflection, không cần hiểu type system của ngôn ngữ đó.
+Hệ quả: thêm một ngôn ngữ mới rất nhẹ. Frontend chỉ cần đọc được annotation + tên type + tên field, không cần semantic analysis, không cần hiểu type system của ngôn ngữ đó.
+
+Một implementation khác hoàn toàn được phép chọn cách khác - file schema riêng, macro, hay viết codec bằng tay. Chuẩn để đánh giá chỉ có một: byte sinh ra có đúng không.
 
 ---
 
@@ -136,7 +146,7 @@ Cùng schema, cùng giá trị
 Mọi implementation MUST sinh ra byte giống hệt nhau.
 ```
 
-Nếu không giống, đó là **bug của implementation**, không phải của protocol. Và bug đó bắt được bằng một phép so sánh mảng byte — xem tài liệu Conformance.
+Nếu không giống, đó là **bug của implementation**, không phải của protocol. Và bug đó bắt được bằng một phép so sánh mảng byte - xem tài liệu Conformance.
 
 ---
 
@@ -146,13 +156,13 @@ Nếu không giống, đó là **bug của implementation**, không phải của
 
 | Tài liệu | Trả lời câu hỏi |
 |----------|-----------------|
-| [RFC-0001 — Cyclone là gì](RFC-0001.md) | Giải bài toán gì, vì sao chọn, khi nào **không** nên dùng |
-| [RFC-0002 — Wire Format](RFC-0002.md) | Byte phải có hình dạng như thế nào |
-| [RFC-0003 — Conformance](RFC-0003.md) | Làm sao biết implementation của tôi đúng (test vector) |
+| [RFC-0001 - Cyclone là gì](RFC-0001.md) | Giải bài toán gì, vì sao chọn, khi nào **không** nên dùng |
+| [RFC-0002 - Wire Format](RFC-0002.md) | Byte phải có hình dạng như thế nào |
+| [RFC-0003 - Conformance](RFC-0003.md) | Làm sao biết implementation của tôi đúng (test vector) |
 
 Bản dịch tiếng Anh: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
 
-Trang giới thiệu: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) — nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt)
+Trang giới thiệu: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt)
 
 ---
 
@@ -189,14 +199,14 @@ Tiếng Việt là bản gốc, tiếng Anh là bản dịch. Quy trình mô t�
 ├── index.html           landing page, tiếng Anh (GitHub Pages)
 ├── LICENSE              CC BY 4.0
 │
-├── vi/                  tiếng Việt — bản gốc
+├── vi/                  tiếng Việt - bản gốc
 │   ├── README.md
 │   ├── index.html
 │   ├── RFC-0001.md      Cyclone là gì
 │   ├── RFC-0002.md      Wire Format Specification
 │   └── RFC-0003.md      Conformance
 │
-└── en/                  tiếng Anh — bản dịch
+└── en/                  tiếng Anh - bản dịch
     ├── RFC-0001.md
     ├── RFC-0002.md
     └── RFC-0003.md
@@ -204,11 +214,11 @@ Tiếng Việt là bản gốc, tiếng Anh là bản dịch. Quy trình mô t�
 
 ## Giấy phép
 
-Toàn bộ repo này theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — xem [`LICENSE`](../LICENSE).
+Toàn bộ repo này theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - xem [`LICENSE`](../LICENSE).
 
 Bạn được tự do sao chép, dịch, trích dẫn và tạo tác phẩm phái sinh từ specification, kể cả cho mục đích thương mại, miễn là **ghi nhận tác giả**.
 
-Đây là **specification, không phải phần mềm**. Implementation của bạn là một tác phẩm riêng biệt, không phải tác phẩm phái sinh của specification — bạn được toàn quyền chọn giấy phép cho nó.
+Đây là **specification, không phải phần mềm**. Implementation của bạn là một tác phẩm riêng biệt, không phải tác phẩm phái sinh của specification - bạn được toàn quyền chọn giấy phép cho nó.
 
 ## Bản quyền
 
