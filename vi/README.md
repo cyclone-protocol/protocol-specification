@@ -1,56 +1,56 @@
-# Cyclone Protocol
+# Giao thức Cyclone
 
-[English](../README.md) · **Tiếng Việt**
+[Tiếng Anh](../README.md) · **Tiếng Việt**
 
-Cyclone là một cách quy định **dữ liệu được viết thành byte như thế nào**.
+Cyclone định nghĩa cách dữ liệu được ghi dưới dạng các byte.
 
 Chỉ vậy thôi.
 
 ---
 
-## Giải thích trong 30 giây
+## Giải thích nhanh trong 30 giây
 
-Bạn có một `Player`:
+Bạn có một đối tượng `Player`:
 
 ```
 Hp   = 100
 Name = "Alice"
 ```
 
-Cyclone quy định nó thành đúng chuỗi byte này:
+Cyclone quy định rằng nó sẽ trở thành chính xác chuỗi byte sau:
 
 ```
 64 00 00 00   05 00 00 00   41 6C 69 63 65
-   Hp = 100    Length = 5      A  l  i  c  e
+Hp = 100    Độ dài = 5      A  l  i  c  e
 ```
 
-13 byte. Không có tên field, không có dấu ngoặc, không có thẻ đánh dấu - chỉ có dữ liệu.
+13 byte. Không tên trường, không dấu ngoặc, không thẻ (tag) - chỉ thuần túy là dữ liệu.
 
-Điểm mấu chốt: **Go, C#, Rust hay C đều phải sinh ra đúng 13 byte này.** Không phải "tương đương", mà là giống hệt từng byte.
+Điểm mấu chốt: Go, C#, Rust và C đều phải tạo ra chính xác 13 byte này. Không chỉ là "tương đương", mà phải giống hệt nhau đến từng byte.
 
 ---
 
-## Vì sao lại cần điều đó
+## Tại sao lại cần điều này?
 
-Với JSON hay Protobuf, cùng một dữ liệu có thể ra byte khác nhau tuỳ ngôn ngữ, tuỳ thư viện, tuỳ version. Thường thì không sao. Nhưng nó hỏng hẳn khi:
+Với JSON hoặc Protobuf, cùng một dữ liệu có thể tạo ra các chuỗi byte khác nhau tùy thuộc vào ngôn ngữ, thư viện hoặc phiên bản. Thông thường, điều đó không thành vấn đề. Nhưng nó sẽ gây lỗi khi:
 
-- Bạn **ký hoặc hash** payload - chữ ký ký lên byte, byte đổi thì chữ ký sai dù dữ liệu không đổi.
-- Bạn chạy **replay hoặc lockstep** - hai máy phải ra cùng một kết quả từ cùng một chuỗi input.
-- Bạn muốn **kiểm chứng hai SDK tương thích** - cách duy nhất là so byte.
+- Bạn ký hoặc băm (hash) dữ liệu (payload) - chữ ký dựa trên các byte; nếu byte thay đổi, chữ ký sẽ không còn hợp lệ ngay cả khi dữ liệu vẫn giữ nguyên.
+- Bạn chạy mô phỏng phát lại (replay) hoặc đồng bộ từng bước (lockstep) - hai máy tính phải tạo ra cùng một kết quả từ cùng một chuỗi đầu vào.
+- Bạn muốn xác minh tính tương thích của SDK - cách duy nhất là so sánh các byte.
 
-Cyclone giải bài toán này bằng cách bỏ hết lựa chọn: chỗ nào encoder được quyền chọn, chỗ đó hai encoder sẽ chọn khác nhau.
+Cyclone giải quyết vấn đề này bằng cách loại bỏ các lựa chọn: bất cứ khi nào bộ mã hóa (encoder) có quyền lựa chọn, các bộ mã hóa khác nhau chắc chắn sẽ chọn theo cách khác nhau.
 
 ---
 
-## Cyclone không phải cái gì
+## Cyclone không phải là gì
 
 ```
-✗ Networking framework    ✗ RPC
-✗ Game engine             ✗ Transport (TCP/UDP/QUIC)
-✗ Encryption              ✗ Compression
+- Networking framework    - RPC
+- Game engine             - Transport (TCP/UDP/QUIC)
+- Encryption              - Compression
 ```
 
-Những thứ đó xây **phía trên** Cyclone. Cyclone chỉ đứng đúng ở chỗ dữ liệu đổi hình dạng:
+Những thứ đó được xây dựng dựa trên Cyclone. Cyclone hoạt động nghiêm ngặt tại điểm dữ liệu thay đổi hình thức:
 
 ```
 Model  →  Bytes
@@ -59,41 +59,41 @@ Bytes  →  Model
 
 ---
 
-## Cách nó hoạt động
+## Cách thức hoạt động
 
-Bốn quy tắc đủ để hiểu toàn bộ:
+Chỉ cần hiểu bốn quy tắc là đủ để nắm bắt toàn bộ hệ thống:
 
-**1. Số có kích thước cố định, little-endian.** `UInt32` luôn 4 byte, kể cả giá trị 0. Không varint.
+1. Các số có kích thước cố định, định dạng little-endian. Một `UInt32` luôn chiếm 4 byte, ngay cả khi giá trị là 0. Không sử dụng varint (số nguyên kích thước biến đổi).
 
-**2. Chuỗi và mảng có tiền tố độ dài.** `[4 byte length][dữ liệu]`. Với chuỗi, length là **số byte UTF-8**, không phải số ký tự.
+2. Chuỗi và mảng có độ dài xác định ở đầu. `[độ dài 4 byte][dữ liệu]`. Đối với chuỗi, độ dài biểu thị số byte UTF-8, không phải số lượng ký tự.
 
-**3. Model là các field nối liền nhau.** Không header, không padding, không delimiter. Decoder biết đang đọc field nào **nhờ vị trí con trỏ**, không nhờ tag.
+3. Các mô hình (model) bao gồm các trường nằm liền kề nhau. Không có phần tiêu đề (header), không có phần đệm (padding), không có ký tự phân cách. Bộ giải (decoder) mã xác định trường hiện tại dựa trên vị trí con trỏ, không phải thông qua các thẻ (tag).
 
-**4. Không có metadata.** Byte stream không tự mô tả. Bên nhận **bắt buộc** phải biết trước đúng thứ tự và kiểu của từng field.
+4. Không có siêu dữ liệu (metadata). Luồng byte không tự mô tả chính nó. Bên nhận bắt buộc phải biết trước chính xác thứ tự và kiểu dữ liệu của từng trường.
 
-Hệ quả của quy tắc 3 và 4, cần nắm trước khi dùng:
+Hệ quả của quy tắc 3 và 4 - cần hiểu rõ trước khi sử dụng:
 
 ```
-Đổi TÊN field      →  không đổi byte nào        (an toàn)
-Đổi THỨ TỰ field   →  đổi toàn bộ byte stream   (breaking change)
-Sai định nghĩa     →  thường KHÔNG báo lỗi, mà ra dữ liệu sai im lặng
+Thay đổi tên trường      →  không thay đổi byte          (an toàn)
+Thay đổi thứ tự trường   →  thay đổi toàn bộ luồng byte   (gây lỗi tương thích)
+Định nghĩa sai           →  thường không báo lỗi, tạo ra dữ liệu sai mà không có cảnh báo
 ```
 
 ---
 
-## Cyclone không bắt buộc một IDL
+## Cyclone không bắt buộc sử dụng một IDL cụ thể
 
-Nguồn sự thật là **Schema** - tập hợp tên type, tên field, kiểu Cyclone, và thứ tự field. Byte stream sinh ra từ Schema, và chỉ từ Schema.
+Nguồn thông tin chuẩn (source of truth) chính là **Schema**-một tập hợp bao gồm tên kiểu dữ liệu, tên trường, kiểu Cyclone và thứ tự các trường. Luồng byte được tạo ra từ Schema, và *chỉ* từ Schema đó mà thôi.
 
-Nhưng Cyclone không quy định bạn phải **viết** Schema đó ra bằng cách nào:
+Tuy nhiên, Cyclone không quy định *cách* bạn phải viết Schema đó:
 
 ```
-Nhiều cách diễn đạt   →   một Schema   →   đúng một chuỗi byte
+Nhiều cách thể hiện   →   một Schema   →   duy nhất một chuỗi byte
 ```
 
-Không có file `.cyclone` bắt buộc. Không có trình biên dịch IDL bắt buộc. Miễn hai phía rút ra cùng một Schema, byte sẽ giống nhau.
+Không bắt buộc phải có tệp `.cyclone`. Không bắt buộc phải dùng trình biên dịch IDL nào cụ thể. Miễn là cả hai bên cùng tạo ra một Schema giống nhau, thì kết quả byte thu được sẽ hoàn toàn trùng khớp.
 
-Reference Implementation chọn cách diễn đạt bằng annotation ngay trên model có sẵn - ví dụ trong C#:
+Bản triển khai tham chiếu chọn cách thể hiện schema bằng các chú thích (annotation) trực tiếp trên các mô hình hiện có - ví dụ trong C#:
 
 ```csharp
 [Network]
@@ -107,118 +107,110 @@ public partial class Player
 }
 ```
 
-Nó không cần hiểu `public`, `partial`, `class`, `uint`, hay `PlayerInfo` là class hay struct. Chỉ cần trích ra đúng ba thứ để dựng nên Schema:
+Nó không cần phải hiểu các từ khóa `public`, `partial`, `class`, `uint`, hay việc `PlayerInfo` là class hay struct. Chỉ cần trích xuất ba yếu tố cụ thể để xây dựng Schema:
 
 ```
-Type Name    →  Player
-Field Name   →  Hp
-Cyclone Type →  UInt32
+Tên kiểu (Type Name)        →  Player
+Tên trường (Field Name)     →  Hp
+Kiểu Cyclone (Cyclone Type) →  UInt32
 ```
 
-Kiểu Cyclone lấy từ annotation, không suy đoán từ kiểu của ngôn ngữ. Viết `[Network(UInt32)]` trên một field không tương thích là lỗi khai báo và bị báo lỗi - Cyclone không đoán thay bạn.
+Kiểu Cyclone được xác định từ chú thích (annotation) chứ không phải được suy luận từ hệ thống kiểu của ngôn ngữ chủ. Việc đặt `[Network(UInt32)]` lên một trường không tương thích sẽ dẫn đến lỗi khai báo-Cyclone không tự đưa ra các giả định thay cho bạn.
 
-Hệ quả: thêm một ngôn ngữ mới rất nhẹ. Frontend chỉ cần đọc được annotation + tên type + tên field, không cần semantic analysis, không cần hiểu type system của ngôn ngữ đó.
+Kết quả là: việc bổ sung hỗ trợ cho một ngôn ngữ mới trở thành một tác vụ đơn giản, gọn nhẹ. Thành phần frontend chỉ cần đọc chú thích, tên kiểu và tên trường; nó không đòi hỏi phân tích ngữ nghĩa hay sự am hiểu về hệ thống kiểu của ngôn ngữ đích.
 
-Một implementation khác hoàn toàn được phép chọn cách khác - file schema riêng, macro, hay viết codec bằng tay. Chuẩn để đánh giá chỉ có một: byte sinh ra có đúng không.
+Một cách triển khai khác hoàn toàn có thể chọn hướng tiếp cận khác - ví dụ như sử dụng tệp schema riêng, macro, hoặc tự viết mã codec. Chỉ có một tiêu chuẩn duy nhất để đánh giá: liệu các byte dữ liệu được tạo ra có chính xác hay không.
+
+---
+## Khi nào KHÔNG nên sử dụng
+
+Cần làm rõ rằng:
+
+- Lược đồ (schema) thường xuyên thay đổi → mọi sửa đổi phải tránh làm thay đổi thứ tự trường hoặc xóa các trường nằm ở giữa; các trường chỉ được phép thêm vào hoặc loại bỏ ở vị trí cuối cùng.
+- Có nhiều trường "tùy chọn" (optional) → Phiên bản v1 thiếu hỗ trợ cho kiểu Optional/Nullable.
+
+Nếu bất kỳ trường hợp nào trên đây áp dụng cho bạn, Protobuf sẽ là lựa chọn tốt hơn.
 
 ---
 
-## Khi nào KHÔNG nên dùng
-
-Nói trước cho rõ:
-
-- Cần client cũ nói chuyện được với server mới → **Cyclone không hợp**. v1 không có schema evolution.
-- Schema đổi liên tục → mỗi lần đổi phải deploy đồng bộ cả hai phía.
-- Cần đọc dữ liệu bằng mắt → Cyclone là nhị phân thuần.
-- Có nhiều field "có thể không có" → v1 không có Optional/Nullable.
-
-Nếu bạn thuộc các nhóm trên, Protobuf là lựa chọn đúng hơn.
-
----
-
-## Điều Cyclone đảm bảo
+## Cam kết của Cyclone
 
 ```
-Cùng schema, cùng giá trị
+Cùng lược đồ, cùng giá trị
 
 ↓
 
-Mọi implementation MUST sinh ra byte giống hệt nhau.
+Tất cả các bản triển khai (implementation) PHẢI tạo ra các chuỗi byte giống hệt nhau.
 ```
 
-Nếu không giống, đó là **bug của implementation**, không phải của protocol. Và bug đó bắt được bằng một phép so sánh mảng byte - xem tài liệu Conformance.
+Nếu có sự khác biệt, đó là lỗi triển khai, không phải lỗi giao thức. Các lỗi như vậy có thể được phát hiện bằng cách so sánh các mảng byte - hãy tham khảo tài liệu về sự tuân thủ (Conformance).
 
 ---
 
 ## Tài liệu
 
-Đọc theo thứ tự này:
+Hãy đọc theo thứ tự sau:
 
-| Tài liệu | Trả lời câu hỏi |
+| Tài liệu | Giải đáp câu hỏi |
 |----------|-----------------|
-| [RFC-0001 - Cyclone là gì](RFC-0001.md) | Giải bài toán gì, vì sao chọn, khi nào **không** nên dùng |
-| [RFC-0002 - Wire Format](RFC-0002.md) | Byte phải có hình dạng như thế nào |
-| [RFC-0003 - Conformance](RFC-0003.md) | Làm sao biết implementation của tôi đúng (test vector) |
+| [RFC-0001 - Cyclone là gì](RFC-0001.md) | Nó giải quyết vấn đề gì, tại sao nên chọn nó và khi nào không nên sử dụng |
+| [RFC-0002 - Định dạng truyền tải (Wire Format)](RFC-0002.md) | Cấu trúc byte trông như thế nào |
+| [RFC-0003 - Sự tuân thủ (Conformance)](RFC-0003.md) | Làm thế nào để xác minh bản triển khai của tôi có chính xác không (các bộ dữ liệu kiểm thử - test vectors) | Bản dịch tiếng Anh: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
 
-Bản dịch tiếng Anh: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
-
-Trang giới thiệu: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt)
+Trang chủ: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - mã nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt)
 
 ---
 
 ## Đóng góp
 
-Cyclone là **specification**, không phải thư viện. Cần implementation cho Rust, Go, C#/Unity, C/embedded, Zig/C++.
+Cyclone là một bản đặc tả kỹ thuật (specification), không phải là một thư viện. Cần có các bản triển khai cho Rust, Go, C#/Unity, C/embedded và Zig/C++.
 
-Tiêu chí duy nhất để được gọi là **Cyclone Compatible**:
+Tiêu chí duy nhất để đạt chuẩn Cyclone Compatible (Tương thích Cyclone):
 
 ```
-Chạy test vector trong RFC-0003
+Chạy các bộ dữ liệu kiểm thử (test vectors) trong RFC-0003
 
 ↓
 
-Pass 100%
+Đạt 100%
 ```
 
-Không có 98%. Một vector fail nghĩa là tồn tại một dữ liệu mà implementation của bạn và implementation khác bất đồng.
+Không có khái niệm "98%". Chỉ cần một bộ dữ liệu kiểm thử thất bại cũng đồng nghĩa với việc có một phần dữ liệu mà bản triển khai của bạn và một bản triển khai khác không thống nhất với nhau.
 
-Xem [bảng trạng thái ecosystem](https://cyclone-protocol.github.io/cyclone/#implementations) để biết ngôn ngữ nào đang trống.
+Hãy xem [bảng trạng thái hệ sinh thái](https://cyclone-protocol.github.io/cyclone/#implementations) để biết những ngôn ngữ nào hiện chưa có bản triển khai.
 
-### Bản dịch
+### Các bản dịch
 
-Tiếng Việt là bản gốc, tiếng Anh là bản dịch. Quy trình mô tả trong [`TRANSLATION.md`](../TRANSLATION.md).
+Tiếng Việt là ngôn ngữ gốc; tiếng Anh là bản dịch.
 
 ---
 
-## Cấu trúc repo
+## Cấu trúc kho lưu trữ (Repo)
 
 ```
 .
 ├── README.md            tài liệu này (tiếng Anh)
-├── TRANSLATION.md       hai bản ngôn ngữ giữ đồng bộ như thế nào
-├── index.html           landing page, tiếng Anh (GitHub Pages)
 ├── LICENSE              CC BY 4.0
 │
-├── vi/                  tiếng Việt - bản gốc
+├── vi/                  Tiếng Việt - phiên bản gốc
 │   ├── README.md
-│   ├── index.html
 │   ├── RFC-0001.md      Cyclone là gì
-│   ├── RFC-0002.md      Wire Format Specification
-│   └── RFC-0003.md      Conformance
+│   ├── RFC-0002.md      Đặc tả định dạng truyền tải (Wire Format)
+│   └── RFC-0003.md      Sự tuân thủ (Conformance)
 │
-└── en/                  tiếng Anh - bản dịch
-    ├── RFC-0001.md
-    ├── RFC-0002.md
-    └── RFC-0003.md
+└── en/                  Tiếng Anh - phiên bản dịch
+├── RFC-0001.md
+├── RFC-0002.md
+└── RFC-0003.md
 ```
 
 ## Giấy phép
 
-Toàn bộ repo này theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - xem [`LICENSE`](../LICENSE).
+Toàn bộ kho lưu trữ này được cấp phép theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - xem tệp [`LICENSE`](../LICENSE).
 
-Bạn được tự do sao chép, dịch, trích dẫn và tạo tác phẩm phái sinh từ specification, kể cả cho mục đích thương mại, miễn là **ghi nhận tác giả**.
+Bạn được tự do sao chép, dịch, trích dẫn và tạo các tác phẩm phái sinh dựa trên đặc tả này, bao gồm cả mục đích thương mại, với điều kiện bạn ghi nhận nguồn/tác giả một cách phù hợp.
 
-Đây là **specification, không phải phần mềm**. Implementation của bạn là một tác phẩm riêng biệt, không phải tác phẩm phái sinh của specification - bạn được toàn quyền chọn giấy phép cho nó.
+Đây là một bản đặc tả kỹ thuật, không phải phần mềm. Bản triển khai của bạn là một tác phẩm độc lập, không phải là tác phẩm phái sinh của bản đặc tả này - bạn có quyền tự do lựa chọn giấy phép cho nó.
 
 ## Bản quyền
 
