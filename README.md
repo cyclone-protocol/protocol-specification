@@ -118,7 +118,9 @@ The Cyclone type is determined by the annotation rather than being inferred from
 Consequently, adding support for a new language becomes a simple, lightweight task. The frontend component only needs to read annotations, type names, and field names; it requires no semantic analysis or deep understanding of the target language's type system.
 
 A different implementation could easily adopt an alternative approach - such as using separate schema files, macros, or manually writing codec code. There is only one standard for evaluation: whether the generated data bytes are correct.
+
 ---
+
 ## When NOT to use it
 
 It is important to clarify that:
@@ -150,11 +152,13 @@ Please read in the following order:
 
 | Document | Answers the question |
 |----------|-----------------|
-| [RFC-0001 - What is Cyclone](RFC-0001.md) | What problem it solves, why choose it, and when not to use it |
-| [RFC-0002 - Wire Format](RFC-0002.md) | What the byte structure looks like |
-| [RFC-0003 - Conformance](RFC-0003.md) | How to verify the correctness of my implementation (test vectors) | English translations: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
+| [RFC-0001 - What is Cyclone](en/RFC-0001.md) | What problem it solves, why choose it, and when not to use it |
+| [RFC-0002 - Wire Format](en/RFC-0002.md) | What the byte structure looks like |
+| [RFC-0003 - Conformance](en/RFC-0003.md) | How to verify the correctness of my implementation (test vectors) |
 
-Homepage: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - source code at [`index.html`](../index.html) (English) and [`vi/index.html`](index.html) (Vietnamese)
+Vietnamese source of record: [`vi/RFC-0001.md`](vi/RFC-0001.md) · [`vi/RFC-0002.md`](vi/RFC-0002.md) · [`vi/RFC-0003.md`](vi/RFC-0003.md)
+
+Homepage: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - source code at [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese)
 
 ---
 
@@ -174,7 +178,7 @@ Achieve 100% success
 
 There is no such thing as "98%". A single failed test vector implies a discrepancy between your implementation and another implementation.
 
-Check the [ecosystem status table](https://cyclone-protocol.github.io/cyclone/#implementations) to see which languages ​​currently lack an implementation.
+Check the [ecosystem status table](https://cyclone-protocol.github.io/cyclone/#implementations) to see which languages currently lack an implementation.
 
 ### Translations
 
@@ -203,7 +207,7 @@ Vietnamese is the original language; English is the translation.
 
 ## License
 
-This entire repository is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - see the [`LICENSE`](../LICENSE) file.
+This entire repository is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - see the [`LICENSE`](LICENSE) file.
 
 You are free to copy, translate, quote, and create derivative works based on this specification, including for commercial purposes, provided that you give appropriate credit to the source/author.
 
