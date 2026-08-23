@@ -112,7 +112,7 @@ It does not need to understand `public`, `partial`, `class` or `uint`. It does n
 ```
 Type Name        →  Player
 Field Name       →  Hp
-Fomoxa Type     →  UInt32
+Fomoxa Type      →  UInt32
 ```
 
 The Fomoxa type comes from the annotation. It is never inferred from the host language type system. Applying `[Network(UInt32)]` to an incompatible field is a declaration error. Fomoxa does not guess on your behalf.

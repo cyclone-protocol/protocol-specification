@@ -112,7 +112,7 @@ Nó không cần hiểu `public`, `partial`, `class` hay `uint`. Nó không cầ
 ```
 Tên kiểu (Type Name)        →  Player
 Tên field (Field Name)      →  Hp
-Kiểu Fomoxa (Fomoxa Type) →  UInt32
+Kiểu Fomoxa (Fomoxa Type)   →  UInt32
 ```
 
 Kiểu Fomoxa lấy từ annotation, không suy ra từ hệ thống kiểu của ngôn ngữ chủ. Gắn `[Network(UInt32)]` lên một field không tương thích là lỗi khai báo. Fomoxa không đoán thay bạn.
