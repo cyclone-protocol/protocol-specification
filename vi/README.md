@@ -1,14 +1,14 @@
-# Giao thức Cyclone
+# Giao thức Fomoxa
 
-[Tiếng Anh](../README.md) · **Tiếng Việt**
+[Tiếng Anh](../README.md) · Tiếng Việt
 
-Cyclone định nghĩa cách dữ liệu được ghi dưới dạng các byte.
+Fomoxa định nghĩa cách dữ liệu được ghi thành byte.
 
 Chỉ vậy thôi.
 
 ---
 
-## Giải thích nhanh trong 30 giây
+## Giải thích trong 30 giây
 
 Bạn có một đối tượng `Player`:
 
@@ -17,32 +17,32 @@ Hp   = 100
 Name = "Alice"
 ```
 
-Cyclone quy định rằng nó sẽ trở thành chính xác chuỗi byte sau:
+Fomoxa quy định nó phải thành đúng chuỗi byte sau:
 
 ```
 64 00 00 00   05 00 00 00   41 6C 69 63 65
-Hp = 100    Độ dài = 5      A  l  i  c  e
+Hp = 100      Độ dài = 5    A  l  i  c  e
 ```
 
-13 byte. Không tên trường, không dấu ngoặc, không thẻ (tag) - chỉ thuần túy là dữ liệu.
+13 byte. Không tên field, không dấu ngoặc, không tag. Chỉ dữ liệu.
 
-Điểm mấu chốt: Go, C#, Rust và C đều phải tạo ra chính xác 13 byte này. Không chỉ là "tương đương", mà phải giống hệt nhau đến từng byte.
-
----
-
-## Tại sao lại cần điều này?
-
-Với JSON hoặc Protobuf, cùng một dữ liệu có thể tạo ra các chuỗi byte khác nhau tùy thuộc vào ngôn ngữ, thư viện hoặc phiên bản. Thông thường, điều đó không thành vấn đề. Nhưng nó sẽ gây lỗi khi:
-
-- Bạn ký hoặc băm (hash) dữ liệu (payload) - chữ ký dựa trên các byte; nếu byte thay đổi, chữ ký sẽ không còn hợp lệ ngay cả khi dữ liệu vẫn giữ nguyên.
-- Bạn chạy mô phỏng phát lại (replay) hoặc đồng bộ từng bước (lockstep) - hai máy tính phải tạo ra cùng một kết quả từ cùng một chuỗi đầu vào.
-- Bạn muốn xác minh tính tương thích của SDK - cách duy nhất là so sánh các byte.
-
-Cyclone giải quyết vấn đề này bằng cách loại bỏ các lựa chọn: bất cứ khi nào bộ mã hóa (encoder) có quyền lựa chọn, các bộ mã hóa khác nhau chắc chắn sẽ chọn theo cách khác nhau.
+Điểm mấu chốt: Go, C#, Rust và C đều phải sinh đúng 13 byte này. Không phải "tương đương". Giống hệt từng byte.
 
 ---
 
-## Cyclone không phải là gì
+## Tại sao cần điều này?
+
+Với JSON hoặc Protobuf, cùng một dữ liệu có thể ra nhiều chuỗi byte khác nhau. Khác ngôn ngữ, khác thư viện, khác phiên bản là khác byte. Phần lớn trường hợp điều đó vô hại. Nó gãy khi:
+
+- Bạn ký hoặc hash payload. Chữ ký bám vào byte. Byte đổi thì chữ ký hỏng, dù dữ liệu logic không đổi.
+- Bạn chạy replay hoặc lockstep. Hai máy phải ra cùng kết quả từ cùng chuỗi đầu vào.
+- Bạn cần xác minh hai SDK tương thích. Cách duy nhất là so byte.
+
+Fomoxa xử lý bằng cách xoá hết lựa chọn. Ở đâu encoder được quyền chọn, ở đó hai encoder sẽ chọn khác nhau.
+
+---
+
+## Fomoxa không phải là gì
 
 ```
 - Networking framework    - RPC
@@ -50,7 +50,7 @@ Cyclone giải quyết vấn đề này bằng cách loại bỏ các lựa ch�
 - Encryption              - Compression
 ```
 
-Những thứ đó được xây dựng dựa trên Cyclone. Cyclone hoạt động nghiêm ngặt tại điểm dữ liệu thay đổi hình thức:
+Những thứ đó nằm trên Fomoxa. Fomoxa đứng đúng tại chỗ dữ liệu đổi hình dạng:
 
 ```
 Model  →  Bytes
@@ -61,39 +61,39 @@ Bytes  →  Model
 
 ## Cách thức hoạt động
 
-Chỉ cần hiểu bốn quy tắc là đủ để nắm bắt toàn bộ hệ thống:
+Bốn quy tắc là đủ để nắm toàn bộ hệ thống:
 
-1. Các số có kích thước cố định, định dạng little-endian. Một `UInt32` luôn chiếm 4 byte, ngay cả khi giá trị là 0. Không sử dụng varint (số nguyên kích thước biến đổi).
+1. Số có kích thước cố định, little-endian. Một `UInt32` luôn chiếm 4 byte, kể cả khi giá trị bằng 0. Không varint.
 
-2. Chuỗi và mảng có độ dài xác định ở đầu. `[độ dài 4 byte][dữ liệu]`. Đối với chuỗi, độ dài biểu thị số byte UTF-8, không phải số lượng ký tự.
+2. String và Array có độ dài đứng trước. `[độ dài 4 byte][dữ liệu]`. Với String, độ dài là số byte UTF-8, không phải số ký tự.
 
-3. Các mô hình (model) bao gồm các trường nằm liền kề nhau. Không có phần tiêu đề (header), không có phần đệm (padding), không có ký tự phân cách. Bộ giải (decoder) mã xác định trường hiện tại dựa trên vị trí con trỏ, không phải thông qua các thẻ (tag).
+3. Model là các field nằm liền nhau. Không header, không padding, không dấu phân cách. Decoder xác định field bằng vị trí con trỏ, không bằng tag.
 
-4. Không có siêu dữ liệu (metadata). Luồng byte không tự mô tả chính nó. Bên nhận bắt buộc phải biết trước chính xác thứ tự và kiểu dữ liệu của từng trường.
+4. Không metadata. Luồng byte không tự mô tả. Bên nhận phải biết trước thứ tự và kiểu của từng field.
 
-Hệ quả của quy tắc 3 và 4 - cần hiểu rõ trước khi sử dụng:
+Hệ quả của quy tắc 3 và 4. Nắm trước khi dùng:
 
 ```
-Thay đổi tên trường      →  không thay đổi byte          (an toàn)
-Thay đổi thứ tự trường   →  thay đổi toàn bộ luồng byte   (gây lỗi tương thích)
-Định nghĩa sai           →  thường không báo lỗi, tạo ra dữ liệu sai mà không có cảnh báo
+Đổi tên field      →  byte không đổi              (an toàn)
+Đổi thứ tự field   →  đổi toàn bộ luồng byte      (breaking change)
+Định nghĩa sai     →  không báo lỗi, dữ liệu sai  (im lặng)
 ```
 
 ---
 
-## Cyclone không bắt buộc sử dụng một IDL cụ thể
+## Fomoxa không ép một IDL cụ thể
 
-Nguồn thông tin chuẩn (source of truth) chính là **Schema**-một tập hợp bao gồm tên kiểu dữ liệu, tên trường, kiểu Cyclone và thứ tự các trường. Luồng byte được tạo ra từ Schema, và *chỉ* từ Schema đó mà thôi.
+Nguồn sự thật là schema: tên kiểu, tên field, kiểu Fomoxa, thứ tự field. Luồng byte sinh ra từ schema, và *chỉ* từ schema.
 
-Tuy nhiên, Cyclone không quy định *cách* bạn phải viết Schema đó:
+Fomoxa không quy định *cách* bạn viết schema:
 
 ```
-Nhiều cách thể hiện   →   một Schema   →   duy nhất một chuỗi byte
+Nhiều cách thể hiện   →   một schema   →   một chuỗi byte
 ```
 
-Không bắt buộc phải có tệp `.cyclone`. Không bắt buộc phải dùng trình biên dịch IDL nào cụ thể. Miễn là cả hai bên cùng tạo ra một Schema giống nhau, thì kết quả byte thu được sẽ hoàn toàn trùng khớp.
+Không bắt buộc file `.fomoxa`. Không bắt buộc trình biên dịch IDL nào. Hai bên dựng ra cùng một schema thì byte trùng khớp.
 
-Bản triển khai tham chiếu chọn cách thể hiện schema bằng các chú thích (annotation) trực tiếp trên các mô hình hiện có - ví dụ trong C#:
+Reference implementation chọn cách thể hiện schema bằng annotation đặt trên kiểu có sẵn. Ví dụ trong C#:
 
 ```csharp
 [Network]
@@ -107,110 +107,113 @@ public partial class Player
 }
 ```
 
-Nó không cần phải hiểu các từ khóa `public`, `partial`, `class`, `uint`, hay việc `PlayerInfo` là class hay struct. Chỉ cần trích xuất ba yếu tố cụ thể để xây dựng Schema:
+Nó không cần hiểu `public`, `partial`, `class` hay `uint`. Nó không cần biết `PlayerInfo` là class hay struct. Nó chỉ rút ba thứ để dựng schema:
 
 ```
 Tên kiểu (Type Name)        →  Player
-Tên trường (Field Name)     →  Hp
-Kiểu Cyclone (Cyclone Type) →  UInt32
+Tên field (Field Name)      →  Hp
+Kiểu Fomoxa (Fomoxa Type) →  UInt32
 ```
 
-Kiểu Cyclone được xác định từ chú thích (annotation) chứ không phải được suy luận từ hệ thống kiểu của ngôn ngữ chủ. Việc đặt `[Network(UInt32)]` lên một trường không tương thích sẽ dẫn đến lỗi khai báo-Cyclone không tự đưa ra các giả định thay cho bạn.
+Kiểu Fomoxa lấy từ annotation, không suy ra từ hệ thống kiểu của ngôn ngữ chủ. Gắn `[Network(UInt32)]` lên một field không tương thích là lỗi khai báo. Fomoxa không đoán thay bạn.
 
-Kết quả là: việc bổ sung hỗ trợ cho một ngôn ngữ mới trở thành một tác vụ đơn giản, gọn nhẹ. Thành phần frontend chỉ cần đọc chú thích, tên kiểu và tên trường; nó không đòi hỏi phân tích ngữ nghĩa hay sự am hiểu về hệ thống kiểu của ngôn ngữ đích.
+Kết quả: thêm một ngôn ngữ mới là việc nhẹ. Frontend chỉ đọc annotation, tên kiểu và tên field. Nó không cần phân tích ngữ nghĩa hay hiểu hệ thống kiểu của ngôn ngữ đích.
 
-Một cách triển khai khác hoàn toàn có thể chọn hướng tiếp cận khác - ví dụ như sử dụng tệp schema riêng, macro, hoặc tự viết mã codec. Chỉ có một tiêu chuẩn duy nhất để đánh giá: liệu các byte dữ liệu được tạo ra có chính xác hay không.
-
----
-## Khi nào KHÔNG nên sử dụng
-
-Cần làm rõ rằng:
-
-- Lược đồ (schema) thường xuyên thay đổi → mọi sửa đổi phải tránh làm thay đổi thứ tự trường hoặc xóa các trường nằm ở giữa; các trường chỉ được phép thêm vào hoặc loại bỏ ở vị trí cuối cùng.
-- Có nhiều trường "tùy chọn" (optional) → Phiên bản v1 thiếu hỗ trợ cho kiểu Optional/Nullable.
-
-Nếu bất kỳ trường hợp nào trên đây áp dụng cho bạn, Protobuf sẽ là lựa chọn tốt hơn.
+Một implementation khác được quyền đi đường khác: file schema riêng, macro, hoặc codec viết tay. Chỉ có một thước đo: byte sinh ra có đúng không.
 
 ---
 
-## Cam kết của Cyclone
+## Khi nào KHÔNG nên dùng
+
+Nói rõ luôn:
+
+- schema đổi liên tục → mọi sửa đổi phải giữ nguyên thứ tự field và không xoá field ở giữa. Field chỉ được thêm hoặc bớt ở cuối.
+- Nhiều field "optional" → v1.1 không có Optional/Nullable.
+
+Rơi vào một trong hai, hãy dùng Protobuf.
+
+---
+
+## Cam kết của Fomoxa
 
 ```
-Cùng lược đồ, cùng giá trị
+Cùng schema, cùng giá trị
 
 ↓
 
-Tất cả các bản triển khai (implementation) PHẢI tạo ra các chuỗi byte giống hệt nhau.
+Mọi implementation PHẢI sinh ra byte giống hệt nhau.
 ```
 
-Nếu có sự khác biệt, đó là lỗi triển khai, không phải lỗi giao thức. Các lỗi như vậy có thể được phát hiện bằng cách so sánh các mảng byte - hãy tham khảo tài liệu về sự tuân thủ (Conformance).
+Lệch nhau là lỗi implementation, không phải lỗi giao thức. Bắt lỗi này bằng cách so hai mảng byte. Xem RFC-0003.
 
 ---
 
 ## Tài liệu
 
-Hãy đọc theo thứ tự sau:
+Đọc theo thứ tự:
 
 | Tài liệu | Giải đáp câu hỏi |
 |----------|-----------------|
-| [RFC-0001 - Cyclone là gì](RFC-0001.md) | Nó giải quyết vấn đề gì, tại sao nên chọn nó và khi nào không nên sử dụng |
-| [RFC-0002 - Định dạng truyền tải (Wire Format)](RFC-0002.md) | Cấu trúc byte trông như thế nào |
-| [RFC-0003 - Sự tuân thủ (Conformance)](RFC-0003.md) | Làm thế nào để xác minh bản triển khai của tôi có chính xác không (các bộ dữ liệu kiểm thử - test vectors) | Bản dịch tiếng Anh: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
+| [RFC-0001 - Fomoxa là gì](RFC-0001.md) | Nó giải quyết vấn đề gì, tại sao chọn nó, khi nào không nên dùng |
+| [RFC-0002 - Wire Format](RFC-0002.md) | Cấu trúc byte trông như thế nào |
+| [RFC-0003 - Conformance](RFC-0003.md) | Làm sao biết implementation của tôi có đúng không (test vector) |
 
-Trang chủ: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - mã nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt)
+Bản dịch tiếng Anh: [`en/RFC-0001.md`](../en/RFC-0001.md) · [`en/RFC-0002.md`](../en/RFC-0002.md) · [`en/RFC-0003.md`](../en/RFC-0003.md)
+
+Trang chủ: [fomoxa.github.io](https://fomoxa.github.io/). Mã nguồn tại [`index.html`](../index.html) (tiếng Anh) và [`vi/index.html`](index.html) (tiếng Việt).
 
 ---
 
 ## Đóng góp
 
-Cyclone là một bản đặc tả kỹ thuật (specification), không phải là một thư viện. Cần có các bản triển khai cho Rust, Go, C#/Unity, C/embedded và Zig/C++.
+Fomoxa là một đặc tả, không phải thư viện. Cần implementation cho Rust, Go, C#/Unity, C/embedded và Zig/C++.
 
-Tiêu chí duy nhất để đạt chuẩn Cyclone Compatible (Tương thích Cyclone):
+Tiêu chí duy nhất để đạt chuẩn Fomoxa Compatible:
 
 ```
-Chạy các bộ dữ liệu kiểm thử (test vectors) trong RFC-0003
+Chạy test vector trong RFC-0003
 
 ↓
 
 Đạt 100%
 ```
 
-Không có khái niệm "98%". Chỉ cần một bộ dữ liệu kiểm thử thất bại cũng đồng nghĩa với việc có một phần dữ liệu mà bản triển khai của bạn và một bản triển khai khác không thống nhất với nhau.
+Không có mức "98%". Một test vector trượt nghĩa là tồn tại dữ liệu mà implementation của bạn và implementation khác hiểu khác nhau.
 
-Hãy xem [bảng trạng thái hệ sinh thái](https://cyclone-protocol.github.io/cyclone/#implementations) để biết những ngôn ngữ nào hiện chưa có bản triển khai.
+Xem [bảng trạng thái hệ sinh thái](https://fomoxa.github.io/#implementations) để biết ngôn ngữ nào còn trống.
 
 ### Các bản dịch
 
-Tiếng Việt là ngôn ngữ gốc; tiếng Anh là bản dịch.
+Tiếng Việt là ngôn ngữ gốc. Tiếng Anh là bản dịch.
 
 ---
 
-## Cấu trúc kho lưu trữ (Repo)
+## Cấu trúc repo
 
 ```
 .
-├── README.md            tài liệu này (tiếng Anh)
+├── README.md            bản tiếng Anh
 ├── LICENSE              CC BY 4.0
 │
-├── vi/                  Tiếng Việt - phiên bản gốc
-│   ├── README.md
-│   ├── RFC-0001.md      Cyclone là gì
-│   ├── RFC-0002.md      Đặc tả định dạng truyền tải (Wire Format)
-│   └── RFC-0003.md      Sự tuân thủ (Conformance)
+├── vi/                  Tiếng Việt - bản gốc
+│   ├── README.md        tài liệu này
+│   ├── RFC-0001.md      Fomoxa là gì
+│   ├── RFC-0002.md      Wire Format
+│   └── RFC-0003.md      Conformance
 │
-└── en/                  Tiếng Anh - phiên bản dịch
-├── RFC-0001.md
-├── RFC-0002.md
-└── RFC-0003.md
+└── en/                  Tiếng Anh - bản dịch
+    ├── RFC-0001.md
+    ├── RFC-0002.md
+    └── RFC-0003.md
 ```
 
 ## Giấy phép
 
-Toàn bộ kho lưu trữ này được cấp phép theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - xem tệp [`LICENSE`](../LICENSE).
+Toàn bộ repo này cấp phép theo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Xem file [`LICENSE`](../LICENSE).
 
-Bạn được tự do sao chép, dịch, trích dẫn và tạo các tác phẩm phái sinh dựa trên đặc tả này, bao gồm cả mục đích thương mại, với điều kiện bạn ghi nhận nguồn/tác giả một cách phù hợp.
+Bạn được tự do sao chép, dịch, trích dẫn và tạo tác phẩm phái sinh, kể cả cho mục đích thương mại. Điều kiện: ghi nhận nguồn đúng cách.
 
-Đây là một bản đặc tả kỹ thuật, không phải phần mềm. Bản triển khai của bạn là một tác phẩm độc lập, không phải là tác phẩm phái sinh của bản đặc tả này - bạn có quyền tự do lựa chọn giấy phép cho nó.
+Đây là một đặc tả, không phải phần mềm. Implementation của bạn là tác phẩm độc lập, không phải tác phẩm phái sinh của đặc tả này. Bạn tự chọn giấy phép cho nó.
 
 ## Bản quyền
 

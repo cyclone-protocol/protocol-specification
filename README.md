@@ -1,10 +1,10 @@
-# Cyclone Protocol
+# Fomoxa Protocol
 
-**English** · [Vietnamese](vi/README.md)
+English · [Vietnamese](vi/README.md)
 
-Cyclone defines how data is written as bytes.
+Fomoxa defines how data is written as bytes.
 
-That’s it.
+That is all.
 
 ---
 
@@ -17,32 +17,32 @@ Hp   = 100
 Name = "Alice"
 ```
 
-Cyclone specifies that it becomes exactly this byte sequence:
+Fomoxa requires it to become exactly this byte sequence:
 
 ```
 64 00 00 00   05 00 00 00   41 6C 69 63 65
-Hp = 100    Length = 5      A  l  i  c  e
+Hp = 100      Length = 5    A  l  i  c  e
 ```
 
-13 bytes. No field names, no brackets, no tags - just raw data.
+13 bytes. No field names, no brackets, no tags. Data only.
 
-The key point: Go, C#, Rust, and C must all produce these exact 13 bytes. Not just "equivalent," but byte-for-byte identical.
+The key point: Go, C#, Rust and C must all produce these exact 13 bytes. Not "equivalent". Byte-for-byte identical.
 
 ---
 
 ## Why is this needed?
 
-With JSON or Protobuf, the same data can produce different byte sequences depending on the language, library, or version. Usually, that doesn't matter. But it causes issues when:
+With JSON or Protobuf, the same data can produce different byte sequences. A different language, library or version means different bytes. In most cases that is harmless. It breaks when:
 
-- You sign or hash the data (payload) - signatures are based on bytes; if the bytes change, the signature becomes invalid even if the data remains the same.
-- You run replay simulations or lockstep synchronization - two computers must produce the same result from the same input sequence.
-- You want to verify SDK compatibility - comparing bytes is the only way.
+- You sign or hash a payload. The signature binds to bytes. Different bytes void the signature, even when the logical data is unchanged.
+- You run replay or lockstep. Two machines must reach the same result from the same input sequence.
+- You must verify that two SDKs are compatible. Comparing bytes is the only way.
 
-Cyclone solves this by eliminating choices: whenever an encoder has a choice to make, different encoders will inevitably choose differently.
+Fomoxa handles this by removing choices. Wherever an encoder may choose, two encoders will choose differently.
 
 ---
 
-## What Cyclone is not
+## What Fomoxa is not
 
 ```
 - Networking framework    - RPC
@@ -50,7 +50,7 @@ Cyclone solves this by eliminating choices: whenever an encoder has a choice to 
 - Encryption              - Compression
 ```
 
-Those things are built on top of Cyclone. Cyclone operates strictly on data format conversions:
+Those sit on top of Fomoxa. Fomoxa sits exactly where data changes shape:
 
 ```
 Model  →  Bytes
@@ -61,37 +61,39 @@ Bytes  →  Model
 
 ## How it works
 
-Understanding just four rules is sufficient to grasp the entire system:
+Four rules cover the entire system:
 
-1. Numbers are fixed-size and little-endian. A `UInt32` always occupies 4 bytes, even if the value is 0. Varints (variable-size integers) are not used.
+1. Numbers are fixed-size and little-endian. A `UInt32` always occupies 4 bytes, even when the value is 0. No varints.
 
-2. Strings and arrays are prefixed with their length: `[4-byte length][data]`. For strings, the length represents the number of UTF-8 bytes, not the character count.
+2. Strings and arrays are length-prefixed. `[4-byte length][data]`. For a String, the length is the UTF-8 byte count, not the character count.
 
-3. Models consist of contiguous fields. There are no headers, padding, or delimiters. The decoder identifies the current field based on the cursor position, not via tags.
+3. A Model is a run of contiguous fields. No header, no padding, no delimiter. The decoder identifies a field by cursor position, not by tag.
 
-4. There is no metadata. The byte stream is not self-describing; the receiver must already know the exact order and data type of each field.
+4. No metadata. The byte stream is not self-describing. The receiver must know the order and type of every field in advance.
 
-Consequences of rules 3 and 4 - important to understand before use:
+Consequences of rules 3 and 4. Understand them before use:
 
 ```
-Changing field names      →  no change to bytes            (safe)
-Changing field order      →  changes the entire byte stream (breaks compatibility)
-Incorrect definition      →  usually no error; produces incorrect data without warning
+Rename a field       →  bytes unchanged             (safe)
+Reorder fields       →  entire byte stream changes  (breaking change)
+Wrong definition     →  no error, wrong data        (silent)
 ```
 
 ---
 
-## Cyclone does not require a specific IDL
+## Fomoxa does not mandate a specific IDL
 
-The source of truth is the **Schema** - a set comprising data type names, field names, Cyclone types, and field order. The byte stream is generated from the Schema, and *only* from that Schema. However, Cyclone does not dictate *how* you must write that Schema:
+The source of truth is the schema: type name, field names, Fomoxa types, field order. The byte stream is generated from the schema, and *only* from the schema.
+
+Fomoxa does not dictate *how* you write that schema:
 
 ```
-Multiple representations   →   one Schema   →   exactly one byte sequence
+Multiple representations   →   one schema   →   one byte sequence
 ```
 
-There is no requirement for a `.cyclone` file, nor is a specific IDL compiler mandatory. As long as both parties generate the same Schema, the resulting byte output will match perfectly.
+No `.fomoxa` file is required. No specific IDL compiler is required. When both sides build the same schema, the bytes match.
 
-The reference implementation chooses to represent the schema using annotations directly on existing models - for example, in C#:
+The reference implementation represents the schema with annotations placed on existing types. In C#:
 
 ```csharp
 [Network]
@@ -105,113 +107,113 @@ public partial class Player
 }
 ```
 
-It does not need to understand keywords like `public`, `partial`, `class`, or `uint`, nor whether `PlayerInfo` is a class or a struct. It simply extracts three specific elements to construct the Schema:
+It does not need to understand `public`, `partial`, `class` or `uint`. It does not need to know whether `PlayerInfo` is a class or a struct. It extracts three things to build the schema:
 
 ```
 Type Name        →  Player
 Field Name       →  Hp
-Cyclone Type     →  UInt32
+Fomoxa Type     →  UInt32
 ```
 
-The Cyclone type is determined by the annotation rather than being inferred from the host language's type system. Applying `[Network(UInt32)]` to an incompatible field results in a declaration error - Cyclone does not make assumptions on your behalf.
+The Fomoxa type comes from the annotation. It is never inferred from the host language type system. Applying `[Network(UInt32)]` to an incompatible field is a declaration error. Fomoxa does not guess on your behalf.
 
-Consequently, adding support for a new language becomes a simple, lightweight task. The frontend component only needs to read annotations, type names, and field names; it requires no semantic analysis or deep understanding of the target language's type system.
+The result: adding a new language is light work. The frontend reads annotations, type names and field names. It needs no semantic analysis and no knowledge of the target type system.
 
-A different implementation could easily adopt an alternative approach - such as using separate schema files, macros, or manually writing codec code. There is only one standard for evaluation: whether the generated data bytes are correct.
+Another implementation may take a different route: a separate schema file, macros, or a hand-written codec. There is one measure only. Are the generated bytes correct?
 
 ---
 
 ## When NOT to use it
 
-It is important to clarify that:
+Stated plainly:
 
-- Schemas change frequently → modifications must avoid altering field order or removing fields from the middle; fields may only be added or removed at the end.
-- There are many "optional" fields → Version v1 lacks support for Optional/Nullable types.
+- The schema changes constantly → every edit must preserve field order and must not delete fields from the middle. Fields may only be added or removed at the end.
+- Many "optional" fields → v1.1 has no Optional and no Nullable.
 
-If any of the above apply to your use case, Protobuf would be a better choice.
+If either applies, use Protobuf.
 
 ---
 
-## Cyclone's Guarantee
+## The Fomoxa guarantee
 
 ```
 Same schema, same values
 
 ↓
 
-All implementations MUST produce identical byte sequences.
+Every implementation MUST produce identical bytes.
 ```
 
-Any discrepancy indicates an implementation error, not a protocol error. Such errors can be detected by comparing byte arrays - please refer to the Conformance documentation.
+A discrepancy is an implementation bug, not a protocol bug. Catch it by comparing two byte arrays. See RFC-0003.
 
 ---
 
 ## Documentation
 
-Please read in the following order:
+Read in this order:
 
 | Document | Answers the question |
 |----------|-----------------|
-| [RFC-0001 - What is Cyclone](en/RFC-0001.md) | What problem it solves, why choose it, and when not to use it |
+| [RFC-0001 - What is Fomoxa](en/RFC-0001.md) | What it solves, why choose it, when not to use it |
 | [RFC-0002 - Wire Format](en/RFC-0002.md) | What the byte structure looks like |
-| [RFC-0003 - Conformance](en/RFC-0003.md) | How to verify the correctness of my implementation (test vectors) |
+| [RFC-0003 - Conformance](en/RFC-0003.md) | How to know whether my implementation is correct (test vectors) |
 
 Vietnamese source of record: [`vi/RFC-0001.md`](vi/RFC-0001.md) · [`vi/RFC-0002.md`](vi/RFC-0002.md) · [`vi/RFC-0003.md`](vi/RFC-0003.md)
 
-Homepage: [cyclone-protocol.github.io/cyclone](https://cyclone-protocol.github.io/cyclone/) - source code at [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese)
+Homepage: [fomoxa.github.io](https://fomoxa.github.io/). Source at [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese).
 
 ---
 
 ## Contributing
 
-Cyclone is a technical specification, not a library. Implementations are needed for Rust, Go, C#/Unity, C/embedded, and Zig/C++.
+Fomoxa is a specification, not a library. Implementations are needed for Rust, Go, C#/Unity, C/embedded and Zig/C++.
 
-The sole criterion for "Cyclone Compatible" status:
+The sole criterion for Fomoxa Compatible:
 
 ```
 Run the test vectors in RFC-0003
 
 ↓
 
-Achieve 100% success
+Score 100%
 ```
 
-There is no such thing as "98%". A single failed test vector implies a discrepancy between your implementation and another implementation.
+There is no "98%". One failed test vector means data exists on which your implementation and another implementation disagree.
 
-Check the [ecosystem status table](https://cyclone-protocol.github.io/cyclone/#implementations) to see which languages currently lack an implementation.
+Check the [ecosystem status table](https://fomoxa.github.io/#implementations) for languages still uncovered.
 
 ### Translations
 
-Vietnamese is the original language; English is the translation.
+Vietnamese is the source language. English is the translation.
 
 ---
 
-## Repository Structure
+## Repository structure
 
 ```
 .
-├── README.md            This document (English)
+├── README.md            this document (English)
 ├── LICENSE              CC BY 4.0
 │
-├── vi/                  Vietnamese - original version
+├── vi/                  Vietnamese - source of record
 │   ├── README.md
-│   ├── RFC-0001.md      What is Cyclone
-│   ├── RFC-0002.md      Wire Format Specification
+│   ├── RFC-0001.md      What is Fomoxa
+│   ├── RFC-0002.md      Wire Format
 │   └── RFC-0003.md      Conformance
 │
-└── en/                  English - translated version
-├── RFC-0001.md
-├── RFC-0002.md
-└── RFC-0003.md
+└── en/                  English - translation
+    ├── RFC-0001.md
+    ├── RFC-0002.md
+    └── RFC-0003.md
 ```
 
 ## License
 
-This entire repository is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) - see the [`LICENSE`](LICENSE) file.
+This repository is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). See the [`LICENSE`](LICENSE) file.
 
-You are free to copy, translate, quote, and create derivative works based on this specification, including for commercial purposes, provided that you give appropriate credit to the source/author.
+You are free to copy, translate, quote and create derivative works, including for commercial purposes. The condition: give appropriate credit.
 
-This is a technical specification, not software. Your implementation is an independent work, not a derivative work of this specification - you are free to choose the license for it.
+This is a specification, not software. Your implementation is an independent work, not a derivative work of this specification. You choose its license.
 
 ## Copyright
 
