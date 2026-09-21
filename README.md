@@ -1,16 +1,12 @@
-# Fomoxa Protocol
+# Fomoxa protocol
 
 English · [Vietnamese](vi/README.md)
 
-Fomoxa defines how data is written as bytes.
-
-That is all.
-
----
+Fomoxa defines how data is written as bytes, and defines nothing else.
 
 ## A 30-second explanation
 
-You have a `Player` object:
+Take a `Player` object:
 
 ```
 Hp   = 100
@@ -24,23 +20,19 @@ Fomoxa requires it to become exactly this byte sequence:
 Hp = 100      Length = 5    A  l  i  c  e
 ```
 
-13 bytes. No field names, no brackets, no tags. Data only.
+The result is 13 bytes of data with no field names, brackets or tags.
 
-The key point: Go, C#, Rust and C must all produce these exact 13 bytes. Not "equivalent". Byte-for-byte identical.
-
----
+Go, C#, Rust and C must all produce these same 13 bytes. Equivalent output is not enough; the bytes must be identical.
 
 ## Why is this needed?
 
-With JSON or Protobuf, the same data can produce different byte sequences. A different language, library or version means different bytes. In most cases that is harmless. It breaks when:
+With JSON or Protobuf, the same data can produce different byte sequences. A different language, library or version means different bytes. In most cases that is harmless. It breaks in the following cases:
 
-- You sign or hash a payload. The signature binds to bytes. Different bytes void the signature, even when the logical data is unchanged.
-- You run replay or lockstep. Two machines must reach the same result from the same input sequence.
-- You must verify that two SDKs are compatible. Comparing bytes is the only way.
+- Signing or hashing a payload. The signature binds to bytes, so different bytes void the signature even when the logical data is unchanged.
+- Replay or lockstep. Two machines must reach the same result from the same input sequence.
+- Verifying that two SDKs are compatible. Comparing bytes is the only way to do it.
 
-Fomoxa handles this by removing choices. Wherever an encoder may choose, two encoders will choose differently.
-
----
+Fomoxa handles this by removing choices from the encoder. Wherever an encoder may choose, two encoders will choose differently.
 
 ## What Fomoxa is not
 
@@ -57,21 +49,19 @@ Model  →  Bytes
 Bytes  →  Model
 ```
 
----
-
 ## How it works
 
 Four rules cover the entire system:
 
-1. Numbers are fixed-size and little-endian. A `UInt32` always occupies 4 bytes, even when the value is 0. No varints.
+1. Numbers are fixed-size and little-endian. A `UInt32` always occupies 4 bytes, even when the value is 0. There are no varints.
 
-2. Strings and arrays are length-prefixed. `[4-byte length][data]`. For a String, the length is the UTF-8 byte count, not the character count.
+2. Strings and arrays are length-prefixed: `[4-byte length][data]`. For a String, the length is the UTF-8 byte count, not the character count.
 
-3. A Model is a run of contiguous fields. No header, no padding, no delimiter. The decoder identifies a field by cursor position, not by tag.
+3. A Model is a run of contiguous fields with no header, padding or delimiter. The decoder identifies a field by cursor position, not by tag.
 
-4. No metadata. The byte stream is not self-describing. The receiver must know the order and type of every field in advance.
+4. There is no metadata. The byte stream is not self-describing, so the receiver must know the order and type of every field in advance.
 
-Consequences of rules 3 and 4. Understand them before use:
+Rules 3 and 4 have the following consequences, which must be understood before use:
 
 ```
 Rename a field       →  bytes unchanged             (safe)
@@ -79,19 +69,17 @@ Reorder fields       →  entire byte stream changes  (breaking change)
 Wrong definition     →  no error, wrong data        (silent)
 ```
 
----
-
 ## Fomoxa does not mandate a specific IDL
 
 The source of truth is the schema: type name, field names, Fomoxa types, field order. The byte stream is generated from the schema, and *only* from the schema.
 
-Fomoxa does not dictate *how* you write that schema:
+Fomoxa does not dictate *how* the schema is written:
 
 ```
 Multiple representations   →   one schema   →   one byte sequence
 ```
 
-No `.fomoxa` file is required. No specific IDL compiler is required. When both sides build the same schema, the bytes match.
+Neither a `.fomoxa` file nor a specific IDL compiler is required. When both sides build the same schema, the bytes match.
 
 The reference implementation represents the schema with annotations placed on existing types. In C#:
 
@@ -107,7 +95,7 @@ public partial class Player
 }
 ```
 
-It does not need to understand `public`, `partial`, `class` or `uint`. It does not need to know whether `PlayerInfo` is a class or a struct. It extracts three things to build the schema:
+The implementation does not need to understand `public`, `partial`, `class` or `uint`, or to know whether `PlayerInfo` is a class or a struct. It extracts three things to build the schema:
 
 ```
 Type Name        →  Player
@@ -115,24 +103,18 @@ Field Name       →  Hp
 Fomoxa Type      →  UInt32
 ```
 
-The Fomoxa type comes from the annotation. It is never inferred from the host language type system. Applying `[Network(UInt32)]` to an incompatible field is a declaration error. Fomoxa does not guess on your behalf.
+The Fomoxa type comes from the annotation and is never inferred from the host language type system. Applying `[Network(UInt32)]` to an incompatible field is a declaration error; Fomoxa does not guess.
 
-The result: adding a new language is light work. The frontend reads annotations, type names and field names. It needs no semantic analysis and no knowledge of the target type system.
+As a result, adding a new language takes little work. The frontend reads annotations, type names and field names, and needs neither semantic analysis nor knowledge of the target type system.
 
-Another implementation may take a different route: a separate schema file, macros, or a hand-written codec. There is one measure only. Are the generated bytes correct?
-
----
+Another implementation may take a different route, such as a separate schema file, macros or a hand-written codec. The only measure is whether the generated bytes are correct.
 
 ## When NOT to use it
 
-Stated plainly:
-
-- The schema changes constantly → every edit must preserve field order and must not delete fields from the middle. Fields may only be added or removed at the end.
-- Many "optional" fields → v1.1 has no Optional and no Nullable.
+- The schema changes constantly. Every edit must preserve field order and must not delete fields from the middle; fields may only be added or removed at the end.
+- There are many "optional" fields. v1.1 has no Optional and no Nullable.
 
 If either applies, use Protobuf.
-
----
 
 ## The Fomoxa guarantee
 
@@ -144,9 +126,7 @@ Same schema, same values
 Every implementation MUST produce identical bytes.
 ```
 
-A discrepancy is an implementation bug, not a protocol bug. Catch it by comparing two byte arrays. See RFC-0003.
-
----
+A discrepancy is an implementation bug, not a protocol bug, and comparing two byte arrays detects it. See RFC-0003.
 
 ## Documentation
 
@@ -162,8 +142,6 @@ Vietnamese source of record: [`vi/RFC-0001.md`](vi/RFC-0001.md) · [`vi/RFC-0002
 
 Homepage: [fomoxa.github.io](https://fomoxa.github.io/). Source at [`index.html`](index.html) (English) and [`vi/index.html`](vi/index.html) (Vietnamese).
 
----
-
 ## Contributing
 
 Fomoxa is a specification, not a library. Implementations are needed for Rust, Go, C#/Unity, C/embedded and Zig/C++.
@@ -178,15 +156,13 @@ Run the test vectors in RFC-0003
 Score 100%
 ```
 
-There is no "98%". One failed test vector means data exists on which your implementation and another implementation disagree.
+A score of 98% does not qualify. One failed test vector means there is data on which your implementation and another implementation disagree.
 
 Check the [ecosystem status table](https://fomoxa.github.io/#implementations) for languages still uncovered.
 
 ### Translations
 
 Vietnamese is the source language. English is the translation.
-
----
 
 ## Repository structure
 
@@ -211,9 +187,9 @@ Vietnamese is the source language. English is the translation.
 
 This repository is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). See the [`LICENSE`](LICENSE) file.
 
-You are free to copy, translate, quote and create derivative works, including for commercial purposes. The condition: give appropriate credit.
+You are free to copy, translate, quote and create derivative works, including for commercial purposes, provided you give appropriate credit.
 
-This is a specification, not software. Your implementation is an independent work, not a derivative work of this specification. You choose its license.
+This is a specification, not software. Your implementation is an independent work, not a derivative work of this specification, and you choose its license.
 
 ## Copyright
 
